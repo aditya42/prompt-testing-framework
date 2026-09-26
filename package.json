@@ -1,0 +1,1 @@
+{"name":"prompt-regression-framework","private":true,"scripts":{"dev":"concurrently \"npm --prefix apps/api run dev\" \"npm --prefix apps/web run dev\"","install:all":"npm --prefix apps/api install && npm --prefix apps/web install"},"devDependencies":{"concurrently":"latest"}}

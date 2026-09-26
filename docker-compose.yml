@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: promptreg
+      POSTGRES_PASSWORD: promptreg
+      POSTGRES_DB: promptreg
+    ports: ["5432:5432"]
+    volumes:
+      - promptreg_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  api:
+    build: ./apps/api
+    environment:
+      DATABASE_URL: postgresql://promptreg:promptreg@postgres:5432/promptreg
+      PORT: 8080
+    ports: ["8080:8080"]
+    depends_on: [postgres]
+  web:
+    build: ./apps/web
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports: ["5173:80"]
+    depends_on: [api]
+volumes:
+  promptreg_data:
