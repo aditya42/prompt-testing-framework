@@ -1,0 +1,73 @@
+name: Live prompt regression
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Generation model
+        required: true
+        default: gpt-4o-mini
+      judge_model:
+        description: Independent JSON-capable judge
+        required: true
+        default: gpt-4o
+      baseline_prompt:
+        description: Baseline system prompt
+        required: true
+        default: Answer the quality engineering task accurately.
+      candidate_prompt:
+        description: Candidate system prompt
+        required: true
+        default: Answer accurately, prioritize risk and distinguish evidence from assumptions.
+      input_price:
+        description: Generation USD per million input tokens
+        required: true
+      output_price:
+        description: Generation USD per million output tokens
+        required: true
+      limit:
+        description: Number of held-out cases (1-500)
+        required: true
+        default: '5'
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: aditya42/llm-evaluation-framework
+          ref: d41173c0ac2e41855c2978249b1f5c02f64dbc24
+          path: evaluator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aditya42/AI-QE-Eval-500
+          ref: 14962aaf13c088d1c40674967ec6781853548227
+          path: dataset
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r evaluator/requirements.txt && pip install -e evaluator
+      - name: Run live paired prompt benchmark
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          JUDGE: ${{ inputs.judge_model }}
+          BASELINE: ${{ inputs.baseline_prompt }}
+          CANDIDATE: ${{ inputs.candidate_prompt }}
+          INPUT_PRICE: ${{ inputs.input_price }}
+          OUTPUT_PRICE: ${{ inputs.output_price }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          test -n "$OPENAI_API_KEY" || { echo "OPENAI_API_KEY secret required"; exit 1; }
+          python -m llm_eval_framework.live_benchmark --dataset dataset/data/splits/test.jsonl --baseline-model "$MODEL" --candidate-model "$MODEL" --judge-model "$JUDGE" --baseline-prompt "$BASELINE" --candidate-prompt "$CANDIDATE" --baseline-input-price "$INPUT_PRICE" --candidate-input-price "$INPUT_PRICE" --baseline-output-price "$OUTPUT_PRICE" --candidate-output-price "$OUTPUT_PRICE" --limit "$LIMIT" --output live-benchmark.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-prompt-benchmark
+          path: live-benchmark.json
+          if-no-files-found: warn
+          retention-days: 7
